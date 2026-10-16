@@ -1680,7 +1680,9 @@
                 ]
             },
             'explanada': {
-                imagen: 'imagenes/convention.webp', rotacionSky: '0 -90 0',
+                // Version 8192x4096 para evitar el exceso de memoria al decodificar
+                // la panoramica original de 11904x5952 en visores VR.
+                imagen: 'imagenes/convention-optimizada.webp', rotacionSky: '0 -90 0',
                 flechas: [
                     { target: 'basquet', position: '1.78 -1 -11.87', rotation: '0 -20 0' },
                     { target: 'eventos', position: '8.54 -1 -8.43', rotation: '0 -60 0' },
@@ -2234,6 +2236,10 @@
         function precargarEscenaAntesDeEntrar(datos, onReady, onError) {
             var src = datos && datos.imagen;
             if (!src || src.startsWith('#')) {
+                onReady();
+                return;
+            }
+            if (_preCache[src]) {
                 onReady();
                 return;
             }
@@ -2978,20 +2984,43 @@
         }
 
         const _preCache = {};
+        var _precargaAdyacenteToken = 0;
         function precargarAdyacentes(nombreEscena) {
             var datos = escenas[nombreEscena];
             if (!datos || !datos.flechas) return;
-            datos.flechas.forEach(function (flecha) {
+
+            // Los panoramas se decodifican a texturas muy grandes. Cargarlos todos
+            // en paralelo dispara el uso de memoria en Quest, asi que los vecinos
+            // se preparan de uno en uno y se cancela la cola de la escena anterior.
+            var token = ++_precargaAdyacenteToken;
+            var pendientes = datos.flechas.map(function (flecha) {
                 var destino = escenas[flecha.target];
-                if (!destino) return;
-                var src = destino.imagen;
-                if (!src || src.startsWith('#') || _preCache[src]) return;
+                return destino && destino.imagen;
+            }).filter(function (src, indice, lista) {
+                return src && !src.startsWith('#') && !_preCache[src] && lista.indexOf(src) === indice;
+            });
+
+            function cargarSiguiente() {
+                if (token !== _precargaAdyacenteToken || !pendientes.length) return;
+                var src = pendientes.shift();
                 var img = new Image();
                 img.onload = function () {
                     _preCache[src] = true;
+                    setTimeout(cargarSiguiente, 0);
                 };
+                img.onerror = function () {
+                    setTimeout(cargarSiguiente, 0);
+                };
+                img.decoding = 'async';
+                if ('fetchPriority' in img) img.fetchPriority = 'low';
                 img.src = src;
-            });
+            }
+
+            if ('requestIdleCallback' in window) {
+                window.requestIdleCallback(cargarSiguiente, { timeout: 1200 });
+            } else {
+                setTimeout(cargarSiguiente, 250);
+            }
         }
 
         /* ── Datos para las 2D info cards ── */
