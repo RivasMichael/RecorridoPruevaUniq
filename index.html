@@ -2027,18 +2027,14 @@
                 el.addEventListener('click', function (evt) {
                     if (_transicionActiva) return;
                     if (_isDragging) return;
-                    var hotspotCercano = hotspotVisibleCercanoAlClick(evt);
-                    if (hotspotCercano) {
-                        var panelTarget = getHotspotTarget(hotspotCercano);
-                        if (panelTarget) abrirPanelVR(document.querySelector(panelTarget));
+                    var target = el.getAttribute('data-target');
+                    var direccionDeseada = el.getAttribute('data-mirar');
+                    if (target && target !== "null") {
                         if (evt.preventDefault) evt.preventDefault();
                         if (evt.stopPropagation) evt.stopPropagation();
                         if (evt.stopImmediatePropagation) evt.stopImmediatePropagation();
-                        return;
+                        iniciarTransicion(target, direccionDeseada);
                     }
-                    var target = el.getAttribute('data-target');
-                    var direccionDeseada = el.getAttribute('data-mirar');
-                    if (target && target !== "null") iniciarTransicion(target, direccionDeseada);
                 });
                 el.addEventListener('mouseenter', function () {
                     el.setAttribute('scale', '1.65 1.65 1.65');
@@ -2190,6 +2186,39 @@
         var _transicionToken = 0;
         var _transicionActiva = false;
         var _cieloActivoId = 'cielo-fondo';
+        var _transicionWatchdog = null;
+
+        function mostrarEstadoVR(mensaje, tipo) {
+            var loaderVr = document.getElementById('vr-loader');
+            var textoVr = document.getElementById('vr-loader-text');
+            var fondoVr = document.getElementById('vr-loader-bg');
+            if (textoVr) textoVr.setAttribute('value', mensaje || 'Cargando escena...');
+            if (fondoVr) fondoVr.setAttribute('material', 'color', tipo === 'error' ? '#8F1029' : '#111111');
+            if (loaderVr) loaderVr.setAttribute('visible', 'true');
+        }
+
+        function ocultarEstadoVR() {
+            var loaderVr = document.getElementById('vr-loader');
+            if (loaderVr) loaderVr.setAttribute('visible', 'false');
+        }
+
+        function liberarTransicion(token, mensajeError) {
+            if (token !== _transicionToken) return;
+            // Invalida callbacks tardios de imagen/video para que una escena fallida
+            // no aparezca de golpe despues de haber devuelto el control al usuario.
+            if (mensajeError) _transicionToken++;
+            clearTimeout(_transicionWatchdog);
+            _transicionWatchdog = null;
+            _transicionActiva = false;
+            ocultarLoader(true);
+            refreshRaycasters();
+            if (mensajeError) {
+                mostrarEstadoVR(mensajeError, 'error');
+                setTimeout(function () {
+                    if (!_transicionActiva) ocultarEstadoVR();
+                }, 3500);
+            }
+        }
 
         function precargarEscenaAntesDeEntrar(datos, onReady, onError) {
             var src = datos && datos.imagen;
@@ -2239,18 +2268,19 @@
             }
             var tokenTransicion = ++_transicionToken;
             _transicionActiva = true;
-            var loaderVr = document.getElementById('vr-loader');
-            if (loaderVr) loaderVr.setAttribute('visible', 'false');
             mostrarLoaderTransicion('Cargando escena…');
+            mostrarEstadoVR('Cargando escena...', 'loading');
+            clearTimeout(_transicionWatchdog);
+            _transicionWatchdog = setTimeout(function () {
+                liberarTransicion(tokenTransicion, 'La escena tardo demasiado. Intenta nuevamente.');
+            }, 26000);
 
             precargarEscenaAntesDeEntrar(datos, function () {
                 if (tokenTransicion !== _transicionToken) return;
                 ejecutarTransicionLista();
             }, function () {
                 if (tokenTransicion !== _transicionToken) return;
-                _transicionActiva = false;
-                ocultarLoader(true);
-                refreshRaycasters();
+                liberarTransicion(tokenTransicion, 'No se pudo cargar la escena. Intenta nuevamente.');
             });
 
             function ejecutarTransicionLista() {
@@ -2320,9 +2350,12 @@
                     }
                     if (overlayFade) overlayFade.setAttribute('material', 'opacity', 0);
                     ocultarLoader(true);
+                    ocultarEstadoVR();
                     refreshRaycasters();
                     _escenaActual = nombreEscena;
                     _transicionActiva = false;
+                    clearTimeout(_transicionWatchdog);
+                    _transicionWatchdog = null;
                     actualizarDestinosActivos();
                     precargarAdyacentes(nombreEscena);
                 }
@@ -2346,9 +2379,7 @@
                     if (_revealed || tokenTransicion !== _transicionToken) return;
                     cieloDestino.removeEventListener('materialtextureloaded', revelarEscena);
                     cieloDestino.setAttribute('visible', 'false');
-                    _transicionActiva = false;
-                    ocultarLoader(true);
-                    refreshRaycasters();
+                    liberarTransicion(tokenTransicion, 'No se pudo preparar la escena. Intenta nuevamente.');
                     console.warn('La escena nueva no terminó de prepararse; se conserva la escena actual.');
                 }, datos.video360 ? 12000 : 10000);
             }, duracionFade + 50);
@@ -4417,6 +4448,13 @@
             <a-camera id="camara-principal" camera wasd-controls-enabled="false" look-controls="reverseMouseDrag: true">
                 <a-entity cursor="fuse: false; rayOrigin: mouse"
                     raycaster="objects: .clickable, .icono-hotspot; far: 100">
+                </a-entity>
+
+                <a-entity id="vr-loader" position="0 0 -2.2" visible="false">
+                    <a-plane id="vr-loader-bg" width="1.75" height="0.48"
+                        material="shader: flat; color: #111111; opacity: 0.92; transparent: true"></a-plane>
+                    <a-text id="vr-loader-text" value="Cargando escena..." align="center" color="#FFFFFF"
+                        width="1.55" wrap-count="34" position="0 0 0.01"></a-text>
                 </a-entity>
 
                 <a-entity id="overlay-fade" geometry="primitive: sphere; radius: 0.1"
