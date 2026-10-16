@@ -2192,8 +2192,19 @@
             var loaderVr = document.getElementById('vr-loader');
             var textoVr = document.getElementById('vr-loader-text');
             var fondoVr = document.getElementById('vr-loader-bg');
+            var bordeVr = document.getElementById('vr-loader-border');
+            var spinnerVr = document.getElementById('vr-loader-spinner');
+            var barraVr = document.getElementById('vr-loader-bar');
+            var subtituloVr = document.getElementById('vr-loader-subtext');
+            var esError = tipo === 'error';
             if (textoVr) textoVr.setAttribute('value', mensaje || 'Cargando escena...');
-            if (fondoVr) fondoVr.setAttribute('material', 'color', tipo === 'error' ? '#8F1029' : '#111111');
+            if (fondoVr) fondoVr.setAttribute('material', 'color', esError ? '#3A101A' : '#111111');
+            if (bordeVr) bordeVr.setAttribute('material', 'color', esError ? '#FF6B84' : '#E3173E');
+            if (spinnerVr) spinnerVr.setAttribute('visible', esError ? 'false' : 'true');
+            if (barraVr) barraVr.setAttribute('visible', esError ? 'false' : 'true');
+            if (subtituloVr) subtituloVr.setAttribute('value', esError
+                ? 'Puedes seleccionar nuevamente el destino'
+                : 'Preparando el recorrido 360');
             if (loaderVr) loaderVr.setAttribute('visible', 'true');
         }
 
@@ -2301,13 +2312,23 @@
                 if (tokenTransicion !== _transicionToken) return;
                 var _revealed = false;
                 var _revealTimeout;
+                var videoFuente = null;
+
+                function limpiarEventosRevelado() {
+                    cieloDestino.removeEventListener('materialtextureloaded', revelarEscena);
+                    if (video360Fondo) video360Fondo.removeEventListener('materialtextureloaded', revelarEscena);
+                    if (videoFuente) {
+                        videoFuente.removeEventListener('loadeddata', revelarEscena);
+                        videoFuente.removeEventListener('canplay', revelarEscena);
+                    }
+                }
 
                 function revelarEscena() {
                     if (tokenTransicion !== _transicionToken) return;
                     if (_revealed) return;
                     _revealed = true;
                     clearTimeout(_revealTimeout);
-                    cieloDestino.removeEventListener('materialtextureloaded', revelarEscena);
+                    limpiarEventosRevelado();
 
                     if (!datos.video360) {
                         if (video360Fondo) video360Fondo.setAttribute('visible', 'false');
@@ -2362,22 +2383,38 @@
 
                 cieloDestino.addEventListener('materialtextureloaded', revelarEscena);
                 if (datos.video360 && video360Fondo) {
-                    video360Fondo.addEventListener('materialtextureloaded', revelarEscena, { once: true });
+                    videoFuente = document.querySelector(datos.imagen);
+                    video360Fondo.addEventListener('materialtextureloaded', revelarEscena);
+                    if (videoFuente) {
+                        videoFuente.addEventListener('loadeddata', revelarEscena);
+                        videoFuente.addEventListener('canplay', revelarEscena);
+                    }
                     prepararVideo360Robotica();
                     video360Fondo.setAttribute('src', datos.imagen);
                     video360Fondo.setAttribute('rotation', datos.rotacionSky || "0 -90 0");
                     video360Fondo.setAttribute('visible', 'false');
                     reproducirVideo360Robotica();
+                    if (videoFuente && videoFuente.readyState >= 2) {
+                        setTimeout(revelarEscena, 120);
+                    }
                 } else {
                     cieloDestino.setAttribute('visible', 'false');
                     var texturaYaPreparada = cieloDestino.getAttribute('src') === datos.imagen;
                     cieloDestino.setAttribute('src', datos.imagen);
                     cieloDestino.setAttribute('rotation', datos.rotacionSky || "0 -90 0");
-                    if (texturaYaPreparada) requestAnimationFrame(revelarEscena);
+                    // La imagen ya fue cargada y decodificada por la precarga anterior.
+                    // En Quest, A-Frame no siempre vuelve a emitir materialtextureloaded
+                    // cuando la respuesta proviene de cache, por lo que confirmamos tras
+                    // dos frames sin obligar al usuario a esperar el timeout de 10 segundos.
+                    requestAnimationFrame(function () {
+                        requestAnimationFrame(function () {
+                            setTimeout(revelarEscena, texturaYaPreparada ? 80 : 180);
+                        });
+                    });
                 }
                 _revealTimeout = setTimeout(function () {
                     if (_revealed || tokenTransicion !== _transicionToken) return;
-                    cieloDestino.removeEventListener('materialtextureloaded', revelarEscena);
+                    limpiarEventosRevelado();
                     cieloDestino.setAttribute('visible', 'false');
                     liberarTransicion(tokenTransicion, 'No se pudo preparar la escena. Intenta nuevamente.');
                     console.warn('La escena nueva no terminó de prepararse; se conserva la escena actual.');
@@ -4450,11 +4487,34 @@
                     raycaster="objects: .clickable, .icono-hotspot; far: 100">
                 </a-entity>
 
-                <a-entity id="vr-loader" position="0 0 -2.2" visible="false">
-                    <a-plane id="vr-loader-bg" width="1.75" height="0.48"
-                        material="shader: flat; color: #111111; opacity: 0.92; transparent: true"></a-plane>
-                    <a-text id="vr-loader-text" value="Cargando escena..." align="center" color="#FFFFFF"
-                        width="1.55" wrap-count="34" position="0 0 0.01"></a-text>
+                <a-entity id="vr-loader" position="0 -0.05 -2.2" visible="false">
+                    <a-entity id="vr-loader-border"
+                        geometry="primitive: rounded-rect; width: 2.12; height: 0.82; radius: 0.12"
+                        material="shader: flat; color: #E3173E; opacity: 0.98; transparent: true; depthTest: false"
+                        position="0 0 -0.012"></a-entity>
+                    <a-entity id="vr-loader-bg"
+                        geometry="primitive: rounded-rect; width: 2.06; height: 0.76; radius: 0.10"
+                        material="shader: flat; color: #111111; opacity: 0.96; transparent: true; depthTest: false"
+                        position="0 0 -0.006"></a-entity>
+
+                    <a-torus id="vr-loader-spinner" radius="0.115" radius-tubular="0.018" arc="285"
+                        color="#E3173E" position="-0.76 0.08 0.02"
+                        material="shader: flat; depthTest: false"
+                        animation="property: rotation; to: 0 0 -360; loop: true; dur: 850; easing: linear"></a-torus>
+
+                    <a-text id="vr-loader-text" value="Cargando escena..." color="#FFFFFF"
+                        width="1.55" wrap-count="34" position="-0.55 0.15 0.02"
+                        anchor="left" align="left" baseline="center"></a-text>
+                    <a-text id="vr-loader-subtext" value="Preparando el recorrido 360" color="#C9C9C9"
+                        width="1.45" wrap-count="42" position="-0.55 -0.08 0.02"
+                        anchor="left" align="left" baseline="center"></a-text>
+
+                    <a-plane width="1.35" height="0.025" color="#3B3B3B" position="0.18 -0.27 0.018"
+                        material="shader: flat; opacity: 0.9; depthTest: false"></a-plane>
+                    <a-plane id="vr-loader-bar" width="1.35" height="0.025" color="#E3173E"
+                        position="0.18 -0.27 0.022" scale="0.15 1 1"
+                        material="shader: flat; depthTest: false"
+                        animation="property: scale; from: 0.12 1 1; to: 1 1 1; dir: alternate; loop: true; dur: 950; easing: easeInOutSine"></a-plane>
                 </a-entity>
 
                 <a-entity id="overlay-fade" geometry="primitive: sphere; radius: 0.1"
