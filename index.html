@@ -1983,7 +1983,8 @@
 
         const posicionesNavegacion = {
             'fuera': '-10.20 4.22 -6.32',
-            'entrada': '7.36 3.35 9.48'
+            'entrada': '7.36 3.35 9.48',
+            'cafeteria': '6.50 0.92 -10.95'
         };
 
         var _isDragging = false;
@@ -2616,8 +2617,8 @@
                     .replace(/\n/g, ' ')
                     .replace(/^(?:ir|volver|regresar|ingresar) a\s+/i, '');
                 var nombreLugar = tieneMenuRadial ? 'Elegir destino' : (esRegreso ? 'Regresar a ' : 'Ir a ') + destinoLugar;
-                var labelWidth = Math.min(Math.max(nombreLugar.length * 0.11 + 0.55, 1.35), 3.25);
-                var labelHeight = nombreLugar.length > 22 ? 0.58 : 0.44;
+                var labelWidth = 2.35;
+                var labelHeight = 0.52;
 
                 var etiqueta = document.createElement('a-entity');
                 etiqueta.classList.add('etiqueta-flotante');
@@ -2697,7 +2698,7 @@
                         var nombreOpcion = texto3DSeguro(opcion.label || nombresDestinos[opcion.target] || opcion.target)
                             .replace(/\n/g, ' ')
                             .replace(/^(?:ir|volver|regresar|ingresar) a\s+/i, '');
-                        var anchoBurbuja = Math.min(Math.max(nombreOpcion.length * 0.09 + 0.72, 1.45), 2.35);
+                        var anchoBurbuja = 2.35;
                         var burbuja = document.createElement('a-entity');
                         var centroVertical = (item.opciones.length - 1) * 0.31;
                         burbuja.setAttribute('position', `0 ${(centroVertical - indice * 0.62).toFixed(2)} 0`);
