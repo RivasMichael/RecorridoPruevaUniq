@@ -2581,12 +2581,26 @@
                 entidad.setAttribute('transparent', 'true');
 
                 entidad.setAttribute('data-target', flecha.target);
-                entidad.setAttribute('class', 'clickable flecha-tour');
+                entidad.setAttribute('class', 'flecha-tour');
                 if (flecha.mirarAlLlegar) {
                     entidad.setAttribute('data-mirar', flecha.mirarAlLlegar);
                 }
                 var tieneMenuRadial = item.opciones && item.opciones.length > 1;
                 if (!tieneMenuRadial) entidad.setAttribute('tour-logic', '');
+
+                var areaInteractiva = document.createElement('a-plane');
+                areaInteractiva.setAttribute('width', '1.55');
+                areaInteractiva.setAttribute('height', '1.35');
+                areaInteractiva.setAttribute('position', '0 0 -0.03');
+                areaInteractiva.setAttribute('material', 'shader: flat; color: #FFFFFF; opacity: 0.001; transparent: true; depthTest: false; side: double');
+                areaInteractiva.setAttribute('class', 'clickable area-interactiva-flecha');
+                areaInteractiva.setAttribute('data-target', flecha.target);
+                ['mouseenter', 'mouseleave', 'click'].forEach(function (nombreEvento) {
+                    areaInteractiva.addEventListener(nombreEvento, function (evt) {
+                        if (evt.stopPropagation) evt.stopPropagation();
+                        entidad.emit(nombreEvento, evt.detail || {}, false);
+                    });
+                });
 
                 (function (target) {
                     entidad.addEventListener('mouseenter', function () {
@@ -2631,6 +2645,7 @@
                 textoEtiqueta.setAttribute('position', '0 0.02 0.02');
                 etiqueta.appendChild(textoEtiqueta);
 
+                wrapper.appendChild(areaInteractiva);
                 wrapper.appendChild(entidad);
                 if (!tieneMenuRadial) wrapper.appendChild(etiqueta);
 
