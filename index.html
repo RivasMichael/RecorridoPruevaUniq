@@ -112,27 +112,37 @@
 
         #btn-menu-2d {
             position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 15px 30px;
-            background-color: rgba(0, 0, 0, 0.7);
+            right: max(16px, env(safe-area-inset-right));
+            bottom: max(16px, env(safe-area-inset-bottom));
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background-color: rgba(17, 17, 17, 0.72);
             color: white;
-            border: 2px solid #00BFFF;
-            border-radius: 30px;
-            font-size: 16px;
-            font-weight: bold;
+            border: 1px solid rgba(255, 255, 255, 0.36);
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
             cursor: pointer;
             z-index: 100;
-            backdrop-filter: blur(5px);
-            transition: all 0.3s ease;
-            box-shadow: 0 0 15px rgba(0, 191, 255, 0.5);
+            backdrop-filter: blur(10px);
+            opacity: 0.82;
+            transition: opacity .2s ease, background-color .2s ease, transform .2s ease;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+        }
+
+        #btn-menu-2d::before {
+            content: '\1F5FA';
+            font-size: 16px;
+            line-height: 1;
         }
 
         #btn-menu-2d:hover {
             background-color: #E3173E;
-            color: #000;
-            scale: 1.05;
+            color: #FFFFFF;
+            opacity: 1;
+            transform: translateY(-2px);
         }
 
         #btn-capturar {
@@ -161,7 +171,7 @@
             display: none;
         }
         #dbg-panel {
-            position: fixed; bottom: 12px; left: 12px;
+            position: fixed; bottom: 52px; left: 12px;
             background: rgba(0,0,0,0.75); color: #00FF88;
             font-family: monospace; font-size: 13px;
             padding: 8px 12px; border-radius: 6px;
@@ -170,7 +180,7 @@
         }
         #dbg-panel.on { display: block; }
         #dbg-btn {
-            position: fixed; bottom: 12px; right: 12px;
+            position: fixed; bottom: 12px; left: 12px;
             background: rgba(0,0,0,0.75); color: #00FF88;
             font-family: monospace; font-size: 12px;
             padding: 6px 12px; border-radius: 6px;
@@ -304,7 +314,19 @@
         }
 
         #btn-menu-2d {
-            min-width: 168px;
+            min-width: 0;
+        }
+
+        @media (max-width: 520px) {
+            #btn-menu-2d {
+                width: 42px;
+                height: 42px;
+                justify-content: center;
+                padding: 0;
+                font-size: 0;
+            }
+
+            #btn-menu-2d::before { font-size: 18px; }
         }
 
         #destinos-backdrop {
@@ -608,7 +630,7 @@
             'entrada': 'Entrada\nPrincipal', 'jardin': 'Ingresar a campus',
             'explanada': 'Explanada\nConvention', 'eventos': 'Eventos',
             'butacas': 'Butacas', 'biblioteca': 'Biblioteca',
-            'aula': 'Aula', 'fisica': 'Lab de\nFísica', 'conducta': 'Lab de\nConducta',
+            'aula': 'Aula Híbrida', 'fisica': 'Lab de\nFísica', 'conducta': 'Lab de\nConducta',
             'robotica': 'Lab\nrobótica', 'mundo_robotica': 'Mundo 360\nrobótica', 'datalab': 'Data Lab', 'fablab': 'FabLab - sala 1', 'fablab2': 'FabLab - sala 2',
             'estudio_pregrado': 'Sala Estudio\nPregrado', 'estudio_mba': 'Sala Estudio\nMBA',
             'cafeteria': 'Cafetería', 'cafeteria_interior': 'Cafetería\ninterior'
@@ -967,15 +989,18 @@
             schema: {
                 distance: { type: 'number', default: 4.5 },
                 heightOffset: { type: 'number', default: -0.1 },
-                lerp: { type: 'number', default: 0.18 }
+                lerp: { type: 'number', default: 0.18 },
+                fixed: { type: 'boolean', default: false }
             },
             init: function () {
                 this._cam = null;
                 this._targetPos = new THREE.Vector3();
                 this._camWorldPos = new THREE.Vector3();
+                this._locked = false;
             },
             tick: function () {
                 if (!this.el.object3D.visible) return;
+                if (this.data.fixed && this._locked) return;
                 if (!this._cam) {
                     var camEl = document.querySelector('#camara-principal');
                     if (!camEl) return;
@@ -988,11 +1013,13 @@
 
                 this._targetPos.copy(this._camWorldPos).add(direction.multiplyScalar(this.data.distance));
                 this._targetPos.y = this._camWorldPos.y + this.data.heightOffset;
-                this.el.object3D.position.lerp(this._targetPos, this.data.lerp);
+                if (this.data.fixed) this.el.object3D.position.copy(this._targetPos);
+                else this.el.object3D.position.lerp(this._targetPos, this.data.lerp);
 
                 var lookAtPos = new THREE.Vector3().copy(this._camWorldPos);
                 lookAtPos.y = this.el.object3D.position.y;
                 this.el.object3D.lookAt(lookAtPos);
+                if (this.data.fixed) this._locked = true;
             }
         });
 
@@ -1954,6 +1981,11 @@
             'cafeteria_interior': '0 136.02 0'
         };
 
+        const posicionesNavegacion = {
+            'fuera': '-10.20 4.22 -6.32',
+            'entrada': '7.36 3.35 9.48'
+        };
+
         var _isDragging = false;
         var _mousedownX = 0, _mousedownY = 0;
         document.addEventListener('mousedown', function (e) {
@@ -2039,14 +2071,14 @@
                     }
                 });
                 el.addEventListener('mouseenter', function () {
-                    el.setAttribute('scale', '1.65 1.65 1.65');
-                    var etiqueta = el.querySelector('.etiqueta-flotante');
+                    el.setAttribute('scale', '1.20 1.20 1.20');
+                    var etiqueta = el.parentElement && el.parentElement.querySelector('.etiqueta-flotante');
                     if (etiqueta) etiqueta.setAttribute('visible', 'true');
                 });
                 el.addEventListener('mouseleave', function () {
-                    el.setAttribute('scale', '1.65 1.65 1.65');
-                    var etiqueta = el.querySelector('.etiqueta-flotante');
-                    if (etiqueta) etiqueta.setAttribute('visible', 'true');
+                    el.setAttribute('scale', '1.05 1.05 1.05');
+                    var etiqueta = el.parentElement && el.parentElement.querySelector('.etiqueta-flotante');
+                    if (etiqueta) etiqueta.setAttribute('visible', 'false');
                 });
             }
         });
@@ -2187,6 +2219,8 @@
 
         var _transicionToken = 0;
         var _transicionActiva = false;
+        var _escenaActual = null;
+        var _escenaAnterior = null;
         var _cieloActivoId = 'cielo-fondo';
         var _transicionWatchdog = null;
 
@@ -2350,6 +2384,8 @@
                     });
                     btnLanzarMinijuego.setAttribute('visible', 'false');
                     btnLanzarMinijuego.classList.remove('clickable');
+                    _escenaAnterior = _escenaActual;
+                    _escenaActual = nombreEscena;
                     generarFlechas(datos.flechas);
                     aplicarInicioEscena(nombreEscena, direccionDeseada);
                     contenedorFlechas.setAttribute('visible', 'true');
@@ -2371,7 +2407,6 @@
                     ocultarLoader(true);
                     ocultarEstadoVR();
                     refreshRaycasters();
-                    _escenaActual = nombreEscena;
                     _transicionActiva = false;
                     clearTimeout(_transicionWatchdog);
                     _transicionWatchdog = null;
@@ -2493,18 +2528,56 @@
         function generarFlechas(listaFlechas) {
             var contenedor = document.querySelector('#flechas-container');
             contenedor.innerHTML = '';
-            var escalaFlecha = '2.05 2.05 2.05';
-            listaFlechas.forEach(flecha => {
+            contenedor.removeAttribute('menu-follow');
+            contenedor.removeAttribute('look-at');
+            if (posicionesNavegacion[_escenaActual]) {
+                contenedor.setAttribute('position', posicionesNavegacion[_escenaActual]);
+                contenedor.setAttribute('look-at', '[camera]');
+            } else {
+                contenedor.setAttribute('menu-follow', 'distance: 7; heightOffset: 0.35; lerp: 0.18; fixed: true');
+            }
+
+            var regresosFijos = {
+                'jardin': 'entrada'
+            };
+            var targetRegreso = regresosFijos[_escenaActual] || _escenaAnterior;
+            var regreso = listaFlechas.find(function (flecha) {
+                return targetRegreso && flecha.target === targetRegreso;
+            });
+            if (!regreso && targetRegreso && escenas[targetRegreso]) {
+                regreso = { target: targetRegreso };
+            }
+            var opcionesDestinos = listaFlechas.filter(function (flecha) {
+                return !regreso || flecha.target !== regreso.target;
+            });
+            var invertirFlechas = _escenaActual === 'jardin';
+            var navegacion = [];
+            if (regreso) navegacion.push({
+                flecha: regreso,
+                direccion: invertirFlechas ? 'derecha' : 'izquierda',
+                esRegreso: true,
+                x: invertirFlechas ? 0.58 : -0.58,
+                opciones: [regreso]
+            });
+            if (opcionesDestinos.length) navegacion.push({
+                flecha: opcionesDestinos[0],
+                direccion: invertirFlechas ? 'izquierda' : 'derecha',
+                esRegreso: false,
+                x: invertirFlechas ? -0.58 : 0.58,
+                opciones: opcionesDestinos
+            });
+            if (navegacion.length === 1) navegacion[0].x = 0;
+
+            navegacion.forEach(function (item) {
+                var flecha = item.flecha;
 
                 var wrapper = document.createElement('a-entity');
-                wrapper.setAttribute('position', flecha.position);
-                wrapper.setAttribute('scale', normalizarEscalaFlecha(flecha.position));
-                wrapper.setAttribute('animation__float', `property: position; dir: alternate; dur: 2200; easing: easeInOutSine; loop: true; to: ${flecha.position.split(' ')[0]} ${(parseFloat(flecha.position.split(' ')[1]) + 0.22).toFixed(2)} ${flecha.position.split(' ')[2]}`);
+                wrapper.setAttribute('position', item.x + ' 0 0');
 
                 var entidad = document.createElement('a-image');
-                entidad.setAttribute('src', flecha.imgSrc || '#img-flecha-plana');
-                entidad.setAttribute('scale', escalaFlecha);
-                entidad.setAttribute('look-at', '[camera]');
+                var esRegreso = item.esRegreso;
+                entidad.setAttribute('src', item.direccion === 'izquierda' ? '#img-flecha-izquierda' : '#img-flecha-derecha');
+                entidad.setAttribute('scale', '1.05 1.05 1.05');
                 entidad.setAttribute('transparent', 'true');
 
                 entidad.setAttribute('data-target', flecha.target);
@@ -2512,7 +2585,8 @@
                 if (flecha.mirarAlLlegar) {
                     entidad.setAttribute('data-mirar', flecha.mirarAlLlegar);
                 }
-                entidad.setAttribute('tour-logic', '');
+                var tieneMenuRadial = item.opciones && item.opciones.length > 1;
+                if (!tieneMenuRadial) entidad.setAttribute('tour-logic', '');
 
                 (function (target) {
                     entidad.addEventListener('mouseenter', function () {
@@ -2524,33 +2598,28 @@
                     });
                 })(flecha.target);
 
-                var nombreLugar = texto3DSeguro(flecha.label || nombresDestinos[flecha.target] || flecha.target).replace(/\n/g, ' ');
+                var destinoLugar = texto3DSeguro(flecha.label || nombresDestinos[flecha.target] || flecha.target)
+                    .replace(/\n/g, ' ')
+                    .replace(/^(?:ir|volver|regresar|ingresar) a\s+/i, '');
+                var nombreLugar = tieneMenuRadial ? 'Elegir destino' : (esRegreso ? 'Regresar a ' : 'Ir a ') + destinoLugar;
                 var labelWidth = Math.min(Math.max(nombreLugar.length * 0.11 + 0.55, 1.35), 3.25);
                 var labelHeight = nombreLugar.length > 22 ? 0.58 : 0.44;
 
                 var etiqueta = document.createElement('a-entity');
                 etiqueta.classList.add('etiqueta-flotante');
-                etiqueta.setAttribute('position', '0 1.22 0.16');
-                etiqueta.setAttribute('look-at', '[camera]');
-                etiqueta.setAttribute('visible', 'true');
+                etiqueta.setAttribute('position', '0 -0.92 0.16');
+                etiqueta.setAttribute('visible', 'false');
 
                 var fondoEtiqueta = document.createElement('a-plane');
                 fondoEtiqueta.setAttribute('width', labelWidth.toFixed(2));
                 fondoEtiqueta.setAttribute('height', labelHeight.toFixed(2));
-                fondoEtiqueta.setAttribute('material', 'shader: flat; color: #111111; opacity: 0.92; transparent: true; depthTest: false; side: double');
+                fondoEtiqueta.setAttribute('material', 'shader: flat; color: #FF0000; opacity: 0.96; transparent: true; depthTest: false; side: double');
                 fondoEtiqueta.setAttribute('position', '0 0 -0.01');
                 etiqueta.appendChild(fondoEtiqueta);
 
-                var acentoEtiqueta = document.createElement('a-plane');
-                acentoEtiqueta.setAttribute('width', Math.min(labelWidth - 0.28, 0.78).toFixed(2));
-                acentoEtiqueta.setAttribute('height', '0.035');
-                acentoEtiqueta.setAttribute('material', 'shader: flat; color: #E3173E; depthTest: false; side: double');
-                acentoEtiqueta.setAttribute('position', `0 ${(-labelHeight / 2 + 0.07).toFixed(3)} 0.01`);
-                etiqueta.appendChild(acentoEtiqueta);
-
                 var textoEtiqueta = document.createElement('a-entity');
                 textoEtiqueta.setAttribute('troika-text', {
-                    value: nombreLugar,
+                    value: nombreLugar.toUpperCase(),
                     color: '#FFFFFF',
                     fontSize: nombreLugar.length > 22 ? 0.16 : 0.18,
                     maxWidth: labelWidth - 0.24,
@@ -2563,7 +2632,93 @@
                 etiqueta.appendChild(textoEtiqueta);
 
                 wrapper.appendChild(entidad);
-                wrapper.appendChild(etiqueta);
+                if (!tieneMenuRadial) wrapper.appendChild(etiqueta);
+
+                if (tieneMenuRadial) {
+                    var menuRadial = document.createElement('a-entity');
+                    menuRadial.classList.add('menu-radial-destinos');
+                    menuRadial.setAttribute('visible', 'false');
+                    var direccionMenu = item.direccion === 'izquierda' ? -1 : 1;
+                    menuRadial.setAttribute('position', (direccionMenu * 1.90).toFixed(2) + ' 0 0.22');
+                    var cerrarMenuTimer = null;
+
+                    function abrirMenuRadial() {
+                        clearTimeout(cerrarMenuTimer);
+                        contenedor.querySelectorAll('.menu-radial-destinos').forEach(function (otroMenu) {
+                            if (otroMenu === menuRadial) return;
+                            otroMenu.setAttribute('visible', 'false');
+                            var otroWrapper = otroMenu.parentElement;
+                            var otraEtiqueta = otroWrapper && otroWrapper.querySelector('.etiqueta-flotante');
+                            var otraFlecha = otroWrapper && otroWrapper.querySelector('.flecha-tour');
+                            if (otraEtiqueta) otraEtiqueta.setAttribute('visible', 'false');
+                            if (otraFlecha) otraFlecha.setAttribute('scale', '1.05 1.05 1.05');
+                        });
+                        menuRadial.setAttribute('visible', 'true');
+                        etiqueta.setAttribute('visible', 'true');
+                        entidad.setAttribute('scale', '1.20 1.20 1.20');
+                        refreshRaycasters();
+                    }
+
+                    function programarCierreMenu() {
+                        clearTimeout(cerrarMenuTimer);
+                        cerrarMenuTimer = setTimeout(function () {
+                            menuRadial.setAttribute('visible', 'false');
+                            etiqueta.setAttribute('visible', 'false');
+                            entidad.setAttribute('scale', '1.05 1.05 1.05');
+                            refreshRaycasters();
+                        }, 650);
+                    }
+
+                    entidad.addEventListener('mouseenter', abrirMenuRadial);
+                    entidad.addEventListener('mouseleave', programarCierreMenu);
+                    entidad.addEventListener('click', function (evt) {
+                        if (evt.stopPropagation) evt.stopPropagation();
+                        abrirMenuRadial();
+                    });
+                    menuRadial.addEventListener('mouseenter', function () { clearTimeout(cerrarMenuTimer); });
+                    menuRadial.addEventListener('mouseleave', programarCierreMenu);
+
+                    item.opciones.forEach(function (opcion, indice) {
+                        var nombreOpcion = texto3DSeguro(opcion.label || nombresDestinos[opcion.target] || opcion.target)
+                            .replace(/\n/g, ' ')
+                            .replace(/^(?:ir|volver|regresar|ingresar) a\s+/i, '');
+                        var anchoBurbuja = Math.min(Math.max(nombreOpcion.length * 0.09 + 0.72, 1.45), 2.35);
+                        var burbuja = document.createElement('a-entity');
+                        var centroVertical = (item.opciones.length - 1) * 0.31;
+                        burbuja.setAttribute('position', `0 ${(centroVertical - indice * 0.62).toFixed(2)} 0`);
+                        burbuja.setAttribute('geometry', `primitive: rounded-rect; width: ${anchoBurbuja.toFixed(2)}; height: 0.48; radius: 0.07`);
+                        burbuja.setAttribute('material', 'shader: flat; color: #FF0000; opacity: 0.96; transparent: true; depthTest: false; side: double');
+                        burbuja.setAttribute('class', 'clickable opcion-radial');
+                        burbuja.setAttribute('data-target', opcion.target);
+                        burbuja.setAttribute('tour-logic', '');
+                        burbuja.setAttribute('animation__entrada', `property: scale; from: 0.05 0.05 0.05; to: 1 1 1; dur: ${220 + indice * 70}; easing: easeOutBack`);
+                        if (opcion.mirarAlLlegar) burbuja.setAttribute('data-mirar', opcion.mirarAlLlegar);
+
+                        var textoBurbuja = document.createElement('a-entity');
+                        textoBurbuja.setAttribute('troika-text', {
+                            value: nombreOpcion.toUpperCase(),
+                            color: '#FFFFFF',
+                            fontSize: nombreOpcion.length > 20 ? 0.115 : 0.14,
+                            maxWidth: anchoBurbuja - 0.20,
+                            textAlign: 'center',
+                            anchorX: 'center',
+                            anchorY: 'middle',
+                            fontWeight: 'bold'
+                        });
+                        textoBurbuja.setAttribute('position', '0 0 0.03');
+                        burbuja.appendChild(textoBurbuja);
+                        burbuja.addEventListener('mouseenter', function () {
+                            clearTimeout(cerrarMenuTimer);
+                            burbuja.setAttribute('scale', '1.12 1.12 1.12');
+                        });
+                        burbuja.addEventListener('mouseleave', function () {
+                            burbuja.setAttribute('scale', '1 1 1');
+                            programarCierreMenu();
+                        });
+                        menuRadial.appendChild(burbuja);
+                    });
+                    wrapper.appendChild(menuRadial);
+                }
                 contenedor.appendChild(wrapper);
             });
             refreshRaycasters();
@@ -2868,6 +3023,7 @@
             cieloFondo.setAttribute('src', datos.imagen);
             cieloFondo.setAttribute('rotation', datos.rotacionSky || '0 -90 0');
             aplicarInicioEscena('fuera');
+            _escenaActual = 'fuera';
             generarFlechas(datos.flechas);
 
             cieloFondo.addEventListener('materialtextureloaded', function onFirstTexture() {
@@ -2881,7 +3037,9 @@
                 setTimeout(aplicarMarcosPaneles, 200);
             }, 7000);
 
-            document.getElementById('btn-menu-2d').addEventListener('click', toggleMenu3D);
+            document.getElementById('btn-menu-2d').addEventListener('click', toggleDestinosPanel);
+            document.getElementById('destinos-close').addEventListener('click', cerrarDestinosPanel);
+            document.getElementById('destinos-backdrop').addEventListener('click', cerrarDestinosPanel);
             document.querySelector('#btn-lanzar-minijuego').addEventListener('click', activarMinijuego);
             document.querySelector('#btn-volver-tour').addEventListener('click', desactivarMinijuego);
             document.querySelector('#btn-reset-balon').addEventListener('click', resetearPelota);
@@ -2897,7 +3055,8 @@
                 });
             }
 
-            document.getElementById('btn-capturar').addEventListener('click', function () {
+            var btnCapturar = document.getElementById('btn-capturar');
+            if (btnCapturar) btnCapturar.addEventListener('click', function () {
                 var cam = document.querySelector('#camara-principal').getObject3D('camera');
                 if (!cam) return;
 
@@ -3198,7 +3357,7 @@
     </script>
 </head>
 
-<body>
+<body class="debug-tools">
     <div id="pantalla-carga">
         <img src="imagenes/esann.png" alt="ESAN">
         <h1>Esan Xperience 360</h1>
@@ -3277,39 +3436,23 @@
                 ctx.fillText('i', 64, 68);
             }
 
-            function dibujarFlecha(ctx, rot) {
+            function dibujarFlecha(ctx, direccion) {
                 ctx.save();
                 ctx.translate(S / 2, S / 2);
-                ctx.rotate(rot * Math.PI / 180);
+                if (direccion < 0) ctx.scale(-1, 1);
                 ctx.translate(-S / 2, -S / 2);
-                ctx.lineJoin = 'round'; ctx.lineCap = 'round';
 
                 ctx.shadowColor = 'rgba(0,0,0,0.35)';
-                ctx.shadowBlur = 10;
-                ctx.shadowOffsetY = 4;
-
-                ctx.fillStyle = '#FFFFFF';
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetY = 3;
+                ctx.fillStyle = '#FF0000';
                 ctx.beginPath();
-                ctx.moveTo(64, 8);
-                ctx.lineTo(116, 60);
-                ctx.lineTo(91, 60);
-                ctx.lineTo(91, 116);
-                ctx.lineTo(37, 116);
-                ctx.lineTo(37, 60);
-                ctx.lineTo(12, 60);
-                ctx.closePath();
-                ctx.fill();
-
-                ctx.shadowColor = 'transparent';
-                ctx.fillStyle = '#E3173E';
-                ctx.beginPath();
-                ctx.moveTo(64, 18);
-                ctx.lineTo(101, 55);
-                ctx.lineTo(80, 55);
-                ctx.lineTo(80, 105);
-                ctx.lineTo(48, 105);
-                ctx.lineTo(48, 55);
-                ctx.lineTo(27, 55);
+                ctx.moveTo(18, 14);
+                ctx.lineTo(43, 14);
+                ctx.lineTo(105, 64);
+                ctx.lineTo(43, 114);
+                ctx.lineTo(18, 114);
+                ctx.lineTo(80, 64);
                 ctx.closePath();
                 ctx.fill();
                 ctx.restore();
@@ -3317,10 +3460,10 @@
 
             [
                 ['img-info-icon',      function (c) { dibujarInfo(c); }],
-                ['img-flecha-plana',   function (c) { dibujarFlecha(c, 0); }],
-                ['img-flecha-derecha', function (c) { dibujarFlecha(c, 90); }],
-                ['img-flecha-abajo',   function (c) { dibujarFlecha(c, 180); }],
-                ['img-flecha-izquierda', function (c) { dibujarFlecha(c, -90); }]
+                ['img-flecha-plana',   function (c) { dibujarFlecha(c, 1); }],
+                ['img-flecha-derecha', function (c) { dibujarFlecha(c, 1); }],
+                ['img-flecha-abajo',   function (c) { dibujarFlecha(c, -1); }],
+                ['img-flecha-izquierda', function (c) { dibujarFlecha(c, -1); }]
             ].forEach(function (d) {
                 var el = document.getElementById(d[0]);
                 if (!el) return;
@@ -4133,7 +4276,7 @@
             <a-entity id="panel-info-aula" visible="false" smooth-follow card-style scale="1 1 1" data-card-img="imagenes/Fotos/aulasF.webp" data-premium="true">
                 <a-plane color="#FFFFFF" opacity="0.95" width="4" height="1.6" position="0 0 0"></a-plane>
 
-                <a-text value="AULA DE CLASES" color="#E3173E" align="center" width="7" position="0 1.25 0.01"></a-text>
+                <a-text value="AULA HÍBRIDA" color="#E3173E" align="center" width="7" position="0 1.25 0.01"></a-text>
 
                 <a-text
                     value="Espacios tecnológicos diseñados para el aprendizaje activo, debates y casos de negocio."
@@ -4530,10 +4673,8 @@
         <div>Click → <span id="dbg-pos">—</span></div>
     </div>
     <div id="dbg-btn" onclick="dbgToggle()">📐 Coords</div>
-    <!-- Herramientas de captura de coordenadas (solo para pruebas)
     <div id="dbg-start-btn" onclick="dbgCaptureStart()">Capturar inicio</div>
     <div id="dbg-arrow-btn" onclick="dbgStartArrowCapture()">Capturar flecha</div>
-    -->
 
     <script>
         var dbgParams = new URLSearchParams(window.location.search);
@@ -4607,9 +4748,11 @@
         function dbgCaptureArrowFromPoint(pt) {
             var dist = 12;
             var mag = Math.sqrt(pt.x * pt.x + pt.z * pt.z) || 1;
-            var nx = (pt.x / mag * dist).toFixed(2);
-            var nz = (pt.z / mag * dist).toFixed(2);
-            var txt = nx + ' 2 ' + nz;
+            var escala = dist / mag;
+            var nx = (pt.x * escala).toFixed(2);
+            var ny = (pt.y * escala).toFixed(2);
+            var nz = (pt.z * escala).toFixed(2);
+            var txt = nx + ' ' + ny + ' ' + nz;
             var full = "{ target: 'DESTINO', position: '" + txt + "', rotation: '0 0 0' },";
             document.getElementById('dbg-pos').textContent = txt;
             if (navigator.clipboard) {
