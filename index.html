@@ -1056,7 +1056,7 @@
                     icono.classList.add('clickable');
                 });
                 grupo.querySelectorAll('.hotspot-preview').forEach(function (preview) {
-                    preview.setAttribute('visible', 'true');
+                    preview.setAttribute('visible', 'false');
                 });
                 sincronizarPreviewsHotspots(grupo);
             }
@@ -1304,6 +1304,7 @@
             label.removeAttribute('look-at');
             label.setAttribute('position', '0 1.25 0.08');
             label.setAttribute('scale', '1.25 1.25 1.25');
+            label.setAttribute('visible', 'false');
 
             icono._hotspotPreviewEl = label;
             icono.appendChild(label);
@@ -1318,9 +1319,7 @@
                 var target = getHotspotTarget(icono);
                 if (!target || action === 'close') return;
                 var preview = icono._hotspotPreviewEl || crearPreviewHotspot(icono, obtenerTituloPreviewHotspot(target));
-                if (preview && isInVisibleHotspotGroup(icono) && !document.querySelector('.panel-activo')) {
-                    preview.setAttribute('visible', 'true');
-                }
+                if (preview) preview.setAttribute('visible', 'false');
             });
         }
 
@@ -1382,6 +1381,9 @@
                         cancelShrink();
                         setHoverScale(0.9);
                         if (!previewEl) previewEl = el._hotspotPreviewEl || crearPreviewHotspot(el, obtenerTituloPreviewHotspot(data.target));
+                        if (previewEl && isInVisibleHotspotGroup(el) && !document.querySelector('.panel-activo')) {
+                            previewEl.setAttribute('visible', 'true');
+                        }
                     } else {
                         el.setAttribute('color', '#FF5555');
                     }
@@ -1394,6 +1396,7 @@
                             shrinkTimer = null;
                             if (!isPointerOver) setHoverScale(0.8);
                         }, 180);
+                        if (previewEl) previewEl.setAttribute('visible', 'false');
                     } else {
                         el.setAttribute('color', '#FF0000');
                     }
@@ -2561,7 +2564,7 @@
 
             var boton = document.createElement('a-entity');
             boton.setAttribute('geometry', 'primitive: rounded-rect; width: 1.65; height: 0.42; radius: 0.07');
-            boton.setAttribute('material', 'shader: flat; color: #E3173E; opacity: 0.97; transparent: true; depthTest: false');
+            boton.setAttribute('material', 'shader: flat; color: #FF0000; opacity: 0.97; transparent: true; depthTest: false');
             boton.setAttribute('position', recomendacion && recomendacion.position ? recomendacion.position : '0 1.6 -6');
             boton.setAttribute('look-at', '[camera]');
 
@@ -4725,7 +4728,7 @@
             <a-camera id="camara-principal" camera wasd-controls-enabled="false" look-controls="reverseMouseDrag: true">
                 <!-- Controles persistentes para los lentes: siguen siempre la mirada. -->
                 <a-entity id="navegacion-vr" position="0 -0.72 -2.35">
-                    <a-entity id="btn-mapa-vr" position="1.48 0 0" class="clickable" abrir-mapa-vr
+                    <a-entity id="btn-mapa-vr" position="-0.75 0 0" class="clickable" abrir-mapa-vr
                         geometry="primitive: rounded-rect; width: 0.58; height: 0.38; radius: 0.07"
                         material="shader: flat; color: #FFFFFF; opacity: 0.97; transparent: true; depthTest: false">
                         <a-text value="MAPA" align="center" color="#E3173E" width="1.8" position="0 0 0.025"
