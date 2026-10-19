@@ -2107,6 +2107,23 @@
             }
         });
 
+        AFRAME.registerComponent('abrir-mapa-vr', {
+            init: function () {
+                var el = this.el;
+                el.addEventListener('click', function (evt) {
+                    if (evt && evt.stopPropagation) evt.stopPropagation();
+                    if (_transicionActiva) return;
+                    toggleMenu3D();
+                });
+                el.addEventListener('mouseenter', function () {
+                    el.setAttribute('scale', '1.06 1.06 1.06');
+                });
+                el.addEventListener('mouseleave', function () {
+                    el.setAttribute('scale', '1 1 1');
+                });
+            }
+        });
+
         AFRAME.registerComponent('vr-controller-listener', {
             init: function () {
                 var controller = this.el;
@@ -2222,6 +2239,7 @@
         var _transicionActiva = false;
         var _escenaActual = null;
         var _escenaAnterior = null;
+        var _escenasVisitadas = new Set();
         var _cieloActivoId = 'cielo-fondo';
         var _transicionWatchdog = null;
 
@@ -2529,6 +2547,53 @@
         function generarFlechas(listaFlechas) {
             var contenedor = document.querySelector('#flechas-container');
             contenedor.innerHTML = '';
+            _escenasVisitadas.add(_escenaActual);
+
+            var recomendacion = (listaFlechas || []).find(function (opcion) {
+                return escenas[opcion.target] && !_escenasVisitadas.has(opcion.target);
+            });
+            if (!recomendacion) {
+                var pendiente = destinosMVP.find(function (target) {
+                    return escenas[target] && !_escenasVisitadas.has(target);
+                });
+                if (pendiente) recomendacion = { target: pendiente };
+            }
+
+            var boton = document.createElement('a-entity');
+            boton.setAttribute('geometry', 'primitive: rounded-rect; width: 1.65; height: 0.42; radius: 0.07');
+            boton.setAttribute('material', 'shader: flat; color: #E3173E; opacity: 0.97; transparent: true; depthTest: false');
+            boton.setAttribute('position', recomendacion && recomendacion.position ? recomendacion.position : '0 1.6 -6');
+            boton.setAttribute('look-at', '[camera]');
+
+            var texto = document.createElement('a-entity');
+            var nombre = recomendacion ? nombreDestinoPlano(recomendacion.target) : 'Recorrido completo';
+            texto.setAttribute('troika-text', {
+                value: recomendacion ? 'AHORA NOS DIRIGIMOS A:\n' + nombre.toUpperCase() : 'RECORRIDO COMPLETO',
+                color: '#FFFFFF',
+                fontSize: 0.085,
+                maxWidth: 1.48,
+                lineHeight: 1.18,
+                textAlign: 'center',
+                anchorX: 'center',
+                anchorY: 'middle',
+                fontWeight: 'bold'
+            });
+            texto.setAttribute('position', '0 0 0.025');
+            boton.appendChild(texto);
+
+            if (recomendacion) {
+                boton.setAttribute('class', 'clickable recomendacion-tour');
+                boton.setAttribute('data-target', recomendacion.target);
+                boton.setAttribute('tour-logic', '');
+                if (recomendacion.mirarAlLlegar) boton.setAttribute('data-mirar', recomendacion.mirarAlLlegar);
+            } else {
+                boton.setAttribute('material', 'shader: flat; color: #333333; opacity: 0.94; transparent: true; depthTest: false');
+            }
+
+            contenedor.appendChild(boton);
+            refreshRaycasters();
+            return;
+
             contenedor.removeAttribute('menu-follow');
             contenedor.removeAttribute('look-at');
             if (posicionesNavegacion[_escenaActual]) {
@@ -4658,6 +4723,15 @@
             </a-circle>
 
             <a-camera id="camara-principal" camera wasd-controls-enabled="false" look-controls="reverseMouseDrag: true">
+                <!-- Controles persistentes para los lentes: siguen siempre la mirada. -->
+                <a-entity id="navegacion-vr" position="0 -0.72 -2.35">
+                    <a-entity id="btn-mapa-vr" position="1.48 0 0" class="clickable" abrir-mapa-vr
+                        geometry="primitive: rounded-rect; width: 0.58; height: 0.38; radius: 0.07"
+                        material="shader: flat; color: #FFFFFF; opacity: 0.97; transparent: true; depthTest: false">
+                        <a-text value="MAPA" align="center" color="#E3173E" width="1.8" position="0 0 0.025"
+                            font="exo2semibold"></a-text>
+                    </a-entity>
+                </a-entity>
                 <a-entity cursor="fuse: false; rayOrigin: mouse"
                     raycaster="objects: .clickable, .icono-hotspot; far: 100">
                 </a-entity>
